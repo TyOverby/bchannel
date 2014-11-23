@@ -10,4 +10,4 @@ Improvements:
  * None of the methods fail
  * Async by default
  * Possible to send an error as a way to close the channel
- * Multiple iterator methods.
+ * Multiple iterator methods
