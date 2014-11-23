@@ -7,7 +7,6 @@ mod test;
 pub enum CommMsg<T, E> {
     Message(T),
     Error(E),
-    Ping,
 }
 
 #[allow(dead_code)]
@@ -84,17 +83,7 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
     }
 
     pub fn is_closed(&self) -> bool {
-        if * self.closed.read() {
-            true
-        } else {
-            match self.inner.send_opt(CommMsg::Ping) {
-                Ok(()) => false,
-                Err(_) => {
-                    * self.closed.write() = true;
-                    true
-                }
-            }
-        }
+        * self.closed.read()
     }
 }
 
@@ -131,9 +120,6 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
                 * self.closed.write() = true;
                 None
             }
-            Ok(CommMsg::Ping) => {
-                self.recv()
-            }
             Err(comm::TryRecvError::Empty) => None,
             Err(comm::TryRecvError::Disconnected) => {
                 * self.closed.write() = true;
@@ -152,9 +138,6 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
                 * self.error.write() = Some(e);
                 * self.closed.write() = true;
                 None
-            }
-            Ok(CommMsg::Ping) => {
-                self.recv_block()
             }
             Err(()) => {
                 * self.closed.write() = true;
