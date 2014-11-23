@@ -1,6 +1,9 @@
 use std::comm;
 use std::sync::RWLock;
 
+#[cfg(test)]
+mod test;
+
 pub enum CommMsg<T, E> {
     Message(T),
     Error(E),
