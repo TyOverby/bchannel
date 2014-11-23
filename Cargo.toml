@@ -3,3 +3,9 @@
 name = "bchannel"
 version = "0.0.1"
 authors = ["Ty Overby <ty@pre-alpha.com>"]
+
+repository = "https://github.com/TyOverby/bchannel"
+documentation = "http://tyoverby.com/bchannel/bchannel/"
+keywords = ["channel", "bchannel"]
+license = "MIT"
+description = "A better channel API"
