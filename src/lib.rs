@@ -69,6 +69,21 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
         }
     }
 
+    pub fn send_all<I: Iterator<T>>(&self, mut i: I) -> Result<(), (T, I)> {
+        loop {
+            match i.next() {
+                None => break,
+                Some(x) => {
+                    match self.send(x) {
+                        Ok(()) => {}
+                        Err(x) => return Err((x, i))
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn close(self) { }
 
     pub fn error(self, e: E) -> Result<(), E> {
