@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Sender` struct in crate `bchannel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Sender">
+
+    <title>bchannel::Sender - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <section class="sidebar">
+        
+        <p class='location'><a href='index.html'>bchannel</a></p><div class='block struct'><h2>Structs</h2><a class='struct ' href='struct.Receiver.html'>Receiver</a><a class='struct ' href='struct.ReceiverIterator.html'>ReceiverIterator</a><a class='struct current' href='struct.Sender.html'>Sender</a></div><div class='block fn'><h2>Functions</h2><a class='fn ' href='fn.channel.html'>channel</a></div>
+    </section>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press 'S' to search, '?' for more options..."
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>bchannel</a>::<wbr><a class='struct' href=''>Sender</a><wbr></span><span class='out-of-band'><span id='render-detail'>
+            <a id="collapse-all" href="#">[-]
+            </a>&nbsp;<a id="expand-all" href="#">[+]</a>
+        </span><a id='src-34' href='../src/bchannel/home/ty/workspace/rust/bchannel/src/lib.rs.html#21-24'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Sender&lt;T, E&gt; {
+    // some fields omitted
+}</pre><div class='docblock'><p>A better Sender struct.  A sender can send values of type <code>T</code>
+and can signal an error of type <code>E</code>.  (It can only signal one error).</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><a class='stability Unmarked' title='No stability level'></a><code>impl&lt;T, E&gt; <a class='struct' href='../bchannel/struct.Sender.html' title='bchannel::Sender'>Sender</a>&lt;T, E&gt; where T: <a class='trait' href='http://doc.rust-lang.org/nightly/core/kinds/trait.Send.html' title='core::kinds::Send'>Send</a>, E: <a class='trait' href='http://doc.rust-lang.org/nightly/core/kinds/trait.Send.html' title='core::kinds::Send'>Send</a></code></h3><div class='impl-methods'><h4 id='method.send' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.send' class='fnname'>send</a>(&amp;self, t: T) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, T&gt;</code></h4>
+<div class='docblock'><p>Sends a value through the channel asynchronously.
+If the value can not be sent (channel closed) the value
+is returned back in the Result.</p>
+</div><h4 id='method.send_all' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.send_all' class='fnname'>send_all</a>&lt;I: <a class='trait' href='http://doc.rust-lang.org/nightly/core/iter/trait.Iterator.html' title='core::iter::Iterator'>Iterator</a>&lt;T&gt;&gt;(&amp;self, i: I) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(T, I)</a>&gt;</code></h4>
+<div class='docblock'><p>Sends all the value in an iterator through the
+channel.  If any of the sends fails, that value and the
+rest of the iterator are returned.</p>
+</div><h4 id='method.close' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.close' class='fnname'>close</a>(self)</code></h4>
+<div class='docblock'><p>Closes the channel.  Shortcut for std::mem::drop(this).</p>
+</div><h4 id='method.error' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.error' class='fnname'>error</a>(self, e: E) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, E&gt;</code></h4>
+<div class='docblock'><p>Closes the channel with an error.  This is by definition
+the last value that can be sent through the channe.;</p>
+</div><h4 id='method.is_closed' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.is_closed' class='fnname'>is_closed</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<div class='docblock'><p>Returns true if it is known that the channel is closed.
+The channel might be closed, but if you haven&#39;t tried to write
+to it yet, then this method will return the wrong value.</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><a class='stability Unmarked' title='No stability level'></a><code>impl&lt;T, E&gt; <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../bchannel/struct.Sender.html' title='bchannel::Sender'>Sender</a>&lt;T, E&gt; where T: <a class='trait' href='http://doc.rust-lang.org/nightly/core/kinds/trait.Send.html' title='core::kinds::Send'>Send</a>, E: <a class='trait' href='http://doc.rust-lang.org/nightly/core/kinds/trait.Send.html' title='core::kinds::Send'>Send</a></code></h3><div class='impl-methods'><h4 id='method.clone' class='method'><a class='stability Unstable' title='Unstable'></a><code>fn <a href='#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../bchannel/struct.Sender.html' title='bchannel::Sender'>Sender</a>&lt;T, E&gt;</code></h4>
+<h4 id='method.clone_from' class='method'><a class='stability Experimental' title='Experimental: this function is mostly unused'></a><code>fn <a href='#tymethod.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <div id="help" class="hidden">
+        <div class="shortcuts">
+            <h1>Keyboard shortcuts</h1>
+            <dl>
+                <dt>?</dt>
+                <dd>Show this help dialog</dd>
+                <dt>S</dt>
+                <dd>Focus the search field</dd>
+                <dt>&larrb;</dt>
+                <dd>Move up in search results</dd>
+                <dt>&rarrb;</dt>
+                <dd>Move down in search results</dd>
+                <dt>&#9166;</dt>
+                <dd>Go to active search result</dd>
+            </dl>
+        </div>
+        <div class="infos">
+            <h1>Search tricks</h1>
+            <p>
+                Prefix searches with a type followed by a colon (e.g.
+                <code>fn:</code>) to restrict the search to a given type.
+            </p>
+            <p>
+                Accepted types are: <code>fn</code>, <code>mod</code>,
+                <code>struct</code>, <code>enum</code>,
+                <code>trait</code>, <code>typedef</code> (or
+                <code>tdef</code>).
+            </p>
+        </div>
+    </div>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "bchannel";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script async src="../search-index.js"></script>
+</body>
+</html>

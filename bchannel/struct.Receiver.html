@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Receiver` struct in crate `bchannel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Receiver">
+
+    <title>bchannel::Receiver - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <section class="sidebar">
+        
+        <p class='location'><a href='index.html'>bchannel</a></p><div class='block struct'><h2>Structs</h2><a class='struct current' href='struct.Receiver.html'>Receiver</a><a class='struct ' href='struct.ReceiverIterator.html'>ReceiverIterator</a><a class='struct ' href='struct.Sender.html'>Sender</a></div><div class='block fn'><h2>Functions</h2><a class='fn ' href='fn.channel.html'>channel</a></div>
+    </section>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press 'S' to search, '?' for more options..."
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>bchannel</a>::<wbr><a class='struct' href=''>Receiver</a><wbr></span><span class='out-of-band'><span id='render-detail'>
+            <a id="collapse-all" href="#">[-]
+            </a>&nbsp;<a id="expand-all" href="#">[+]</a>
+        </span><a id='src-54' href='../src/bchannel/home/ty/workspace/rust/bchannel/src/lib.rs.html#28-32'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Receiver&lt;T, E&gt; {
+    // some fields omitted
+}</pre><div class='docblock'><p>A better Receiver struct.  A receiver can receive values of type <code>T</code>
+and can contain at most one error of type <code>E</code>.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><a class='stability Unmarked' title='No stability level'></a><code>impl&lt;T, E&gt; <a class='struct' href='../bchannel/struct.Receiver.html' title='bchannel::Receiver'>Receiver</a>&lt;T, E&gt; where T: <a class='trait' href='http://doc.rust-lang.org/nightly/core/kinds/trait.Send.html' title='core::kinds::Send'>Send</a>, E: <a class='trait' href='http://doc.rust-lang.org/nightly/core/kinds/trait.Send.html' title='core::kinds::Send'>Send</a> + <a class='trait' href='http://doc.rust-lang.org/nightly/core/kinds/trait.Sync.html' title='core::kinds::Sync'>Sync</a></code></h3><div class='impl-methods'><h4 id='method.recv' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.recv' class='fnname'>recv</a>(&amp;self) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;T&gt;</code></h4>
+<div class='docblock'><p>If there is a value in the channel, this function returns the
+first value in the channel.</p>
+
+<p>This method is asynchronous and will never fail.</p>
+</div><h4 id='method.recv_block' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.recv_block' class='fnname'>recv_block</a>(&amp;self) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;T&gt;</code></h4>
+<div class='docblock'><p>This method blocks until a value is in the channel
+and then it returns that value.  If the channel is
+closed, None is returned.</p>
+</div><h4 id='method.has_error' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.has_error' class='fnname'>has_error</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<div class='docblock'><p>Returns true if this channel has been closed due to
+an error.</p>
+</div><h4 id='method.take_error' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.take_error' class='fnname'>take_error</a>(&amp;self) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;E&gt;</code></h4>
+<div class='docblock'><p>Returns the error if one exists.
+This moves the value out of the receiver.</p>
+</div><h4 id='method.is_closed' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.is_closed' class='fnname'>is_closed</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<div class='docblock'><p>Returns true if this channel has been closed for any reason:
+* Closed naturally
+* Closed due to an error</p>
+</div><h4 id='method.iter' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.iter' class='fnname'>iter</a>(&amp;self) -&gt; <a class='struct' href='../bchannel/struct.ReceiverIterator.html' title='bchannel::ReceiverIterator'>ReceiverIterator</a>&lt;T, E&gt;</code></h4>
+<div class='docblock'><p>Returns an iterator that will run through all values cached in
+the receiver.  The returned iterator will never block.</p>
+</div><h4 id='method.blocking_iter' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.blocking_iter' class='fnname'>blocking_iter</a>(&amp;self) -&gt; <a class='struct' href='../bchannel/struct.ReceiverIterator.html' title='bchannel::ReceiverIterator'>ReceiverIterator</a>&lt;T, E&gt;</code></h4>
+<div class='docblock'><p>Returns an iterator that will run through all values in the
+channel until the channel closes or an error is sent.
+This function blocks when it runs out of cached values.</p>
+</div><h4 id='method.into_iter' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.into_iter' class='fnname'>into_iter</a>(self) -&gt; <a class='struct' href='../bchannel/struct.ReceiverIterator.html' title='bchannel::ReceiverIterator'>ReceiverIterator</a>&lt;'static, T, E&gt;</code></h4>
+<div class='docblock'><p>Wraps the receiver into an iterator that will run until
+the cached values are exhausted or the channel closes.</p>
+
+<p>This iterator will never block.</p>
+</div><h4 id='method.into_blocking_iter' class='method'><a class='stability Unmarked' title='No stability level'></a><code>fn <a href='#method.into_blocking_iter' class='fnname'>into_blocking_iter</a>(self) -&gt; <a class='struct' href='../bchannel/struct.ReceiverIterator.html' title='bchannel::ReceiverIterator'>ReceiverIterator</a>&lt;'static, T, E&gt;</code></h4>
+<div class='docblock'><p>Wraps the receiver into an iterator that will run until
+the channel closes.</p>
+
+<p>This iterator blocks when it runs out of cached values.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <div id="help" class="hidden">
+        <div class="shortcuts">
+            <h1>Keyboard shortcuts</h1>
+            <dl>
+                <dt>?</dt>
+                <dd>Show this help dialog</dd>
+                <dt>S</dt>
+                <dd>Focus the search field</dd>
+                <dt>&larrb;</dt>
+                <dd>Move up in search results</dd>
+                <dt>&rarrb;</dt>
+                <dd>Move down in search results</dd>
+                <dt>&#9166;</dt>
+                <dd>Go to active search result</dd>
+            </dl>
+        </div>
+        <div class="infos">
+            <h1>Search tricks</h1>
+            <p>
+                Prefix searches with a type followed by a colon (e.g.
+                <code>fn:</code>) to restrict the search to a given type.
+            </p>
+            <p>
+                Accepted types are: <code>fn</code>, <code>mod</code>,
+                <code>struct</code>, <code>enum</code>,
+                <code>trait</code>, <code>typedef</code> (or
+                <code>tdef</code>).
+            </p>
+        </div>
+    </div>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "bchannel";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script async src="../search-index.js"></script>
+</body>
+</html>
