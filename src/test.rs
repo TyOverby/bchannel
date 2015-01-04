@@ -38,7 +38,7 @@ fn iter() {
 
     let mut rx = rx.iter();
 
-    let xs: Vec<uint> = rx.collect();
+    let xs: Vec<uint> = rx.by_ref().collect();
     assert!(xs == vec![5,7,9]);
 
     sx.send(1).unwrap();
@@ -59,7 +59,7 @@ fn into_iter() {
 
     let mut rx = rx.into_iter();
 
-    let xs: Vec<uint> = rx.collect();
+    let xs: Vec<uint> = rx.by_ref().collect();
     assert!(xs == vec![5,7,9]);
 
     sx.send(1).unwrap();
@@ -81,7 +81,7 @@ fn iter_block() {
         sx.send(9u).unwrap();
         sx.close(); // this close is required
 
-        let mut rx = rx.blocking_iter();
+        let rx = rx.blocking_iter();
         let xs: Vec<uint> = rx.collect();
         assert!(xs == vec![5,7,9]);
     }
@@ -94,7 +94,7 @@ fn iter_block() {
         sx.send(9u).unwrap();
         sx.error(()).unwrap(); // this error is required
 
-        let mut rx = rx.blocking_iter();
+        let rx = rx.blocking_iter();
         let xs: Vec<uint> = rx.collect();
         assert!(xs == vec![5,7,9]);
     }
