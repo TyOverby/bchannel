@@ -1,5 +1,7 @@
-use std::comm;
-use std::sync::RWLock;
+
+#![feature(associated_types, default_type_params)]
+
+use std::sync::{mpsc, RWLock};
 
 #[cfg(test)]
 mod test;
@@ -17,13 +19,13 @@ enum MaybeOwned<'a, A: 'a> {
 
 pub struct Sender<T, E> {
     closed: RWLock<bool>,
-    inner: comm::Sender<CommMsg<T, E>>
+    inner: mpsc::Sender<CommMsg<T, E>>
 }
 
 pub struct Receiver<T, E> {
     closed: RWLock<bool>,
     error: RWLock<Option<E>>,
-    inner: comm::Receiver<CommMsg<T, E>>
+    inner: mpsc::Receiver<CommMsg<T, E>>
 }
 
 pub struct ReceiverIterator<'a, T: 'a, E: 'a> {
@@ -42,34 +44,34 @@ impl <'a, A> MaybeOwned<'a A> {
 
 pub fn channel<T, E>() -> (Sender<T, E>, Receiver<T, E>) where
 T: Send, E: Send + Sync{
-    let (tx, rx) = comm::channel();
+    let (tx, rx) = mpsc::channel();
     (Sender::from_old(tx), Receiver::from_old(rx))
 }
 
 impl <T, E> Sender<T, E> where T: Send, E: Send {
-    pub fn from_old(v: comm::Sender<CommMsg<T, E>>) -> Sender<T, E> {
+    pub fn from_old(v: mpsc::Sender<CommMsg<T, E>>) -> Sender<T, E> {
         Sender {
             closed: RWLock::new(false),
             inner: v
         }
     }
 
-    pub fn into_inner(self) -> comm::Sender<CommMsg<T, E>> {
+    pub fn into_inner(self) -> mpsc::Sender<CommMsg<T, E>> {
         self.inner
     }
 
     pub fn send(&self, t: T) -> Result<(), T> {
-        match self.inner.send_opt(CommMsg::Message(t)) {
+        match self.inner.send(CommMsg::Message(t)) {
             Ok(()) => Ok(()),
-            Err(CommMsg::Message(a)) => {
-                * self.closed.write() = true;
+            Err(mpsc::SendError(CommMsg::Message(a))) => {
+                * self.closed.write().unwrap() = true;
                 Err(a)
             },
             Err(_) => unreachable!()
         }
     }
 
-    pub fn send_all<I: Iterator<T>>(&self, mut i: I) -> Result<(), (T, I)> {
+    pub fn send_all<I: Iterator<Item=T>>(&self, mut i: I) -> Result<(), (T, I)> {
         loop {
             match i.next() {
                 None => break,
@@ -87,10 +89,10 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
     pub fn close(self) { }
 
     pub fn error(self, e: E) -> Result<(), E> {
-        match self.inner.send_opt(CommMsg::Error(e)) {
+        match self.inner.send(CommMsg::Error(e)) {
             Ok(()) => Ok(()),
-            Err(CommMsg::Error(a)) => {
-                * self.closed.write() = true;
+            Err(mpsc::SendError(CommMsg::Error(a))) => {
+                * self.closed.write().unwrap() = true;
                 Err(a)
             }
             Err(_) => unreachable!()
@@ -98,7 +100,7 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
     }
 
     pub fn is_closed(&self) -> bool {
-        * self.closed.read()
+        * self.closed.read().unwrap()
     }
 }
 
@@ -106,13 +108,13 @@ impl <T, E> Clone for Sender<T, E> where T: Send, E: Send {
     fn clone(&self) -> Sender<T, E> {
         Sender {
             inner: self.inner.clone(),
-            closed: RWLock::new(*self.closed.read())
+            closed: RWLock::new(*self.closed.read().unwrap())
         }
     }
 }
 
 impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
-    pub fn from_old(v: comm::Receiver<CommMsg<T, E>>) -> Receiver<T, E> {
+    pub fn from_old(v: mpsc::Receiver<CommMsg<T, E>>) -> Receiver<T, E> {
         Receiver {
             closed: RWLock::new(false),
             error: RWLock::new(None),
@@ -120,8 +122,8 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
         }
     }
 
-    pub fn into_inner(self) -> (comm::Receiver<CommMsg<T, E>>, Option<E>) {
-        (self.inner, self.error.write().take())
+    pub fn into_inner(self) -> (mpsc::Receiver<CommMsg<T, E>>, Option<E>) {
+        (self.inner, self.error.write().unwrap().take())
     }
 
     pub fn recv(&self) -> Option<T> {
@@ -131,13 +133,13 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
         match self.inner.try_recv() {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
-                * self.error.write() = Some(e);
-                * self.closed.write() = true;
+                * self.error.write().unwrap() = Some(e);
+                * self.closed.write().unwrap() = true;
                 None
             }
-            Err(comm::TryRecvError::Empty) => None,
-            Err(comm::TryRecvError::Disconnected) => {
-                * self.closed.write() = true;
+            Err(mpsc::TryRecvError::Empty) => None,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                * self.closed.write().unwrap() = true;
                 None
             }
         }
@@ -147,30 +149,30 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
         if self.is_closed() {
             return None
         }
-        match self.inner.recv_opt() {
+        match self.inner.recv() {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
-                * self.error.write() = Some(e);
-                * self.closed.write() = true;
+                * self.error.write().unwrap() = Some(e);
+                * self.closed.write().unwrap() = true;
                 None
             }
-            Err(()) => {
-                * self.closed.write() = true;
+            Err(mpsc::RecvError) => {
+                * self.closed.write().unwrap() = true;
                 None
             }
         }
     }
 
     pub fn has_error(&self) -> bool {
-        self.error.read().is_some()
+        self.error.read().unwrap().is_some()
     }
 
     pub fn take_error(&self) -> Option<E> {
-        self.error.write().take()
+        self.error.write().unwrap().take()
     }
 
     pub fn is_closed(&self) -> bool {
-        * self.closed.read()
+        * self.closed.read().unwrap()
     }
 
     pub fn iter(&self) -> ReceiverIterator<T, E> {
@@ -202,8 +204,9 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
     }
 }
 
-impl <'a, T, E> Iterator<T> for ReceiverIterator<'a, T, E>
+impl <'a, T, E> Iterator for ReceiverIterator<'a, T, E>
 where T: Send, E: Send + Sync {
+    type Item = T;
     fn next(&mut self) -> Option<T> {
         if self.blocking {
             self.reference.borrow().recv_block()
