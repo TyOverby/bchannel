@@ -1,7 +1,7 @@
+#![allow(unstable)]
 
-#![feature(associated_types, default_type_params)]
-
-use std::sync::{mpsc, RWLock};
+use std::sync::{mpsc, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(test)]
 mod test;
@@ -18,13 +18,14 @@ enum MaybeOwned<'a, A: 'a> {
 }
 
 pub struct Sender<T, E> {
-    closed: RWLock<bool>,
+    closed: AtomicBool,
     inner: mpsc::Sender<CommMsg<T, E>>
 }
 
 pub struct Receiver<T, E> {
-    closed: RWLock<bool>,
-    error: RWLock<Option<E>>,
+    closed: AtomicBool,
+    errored: AtomicBool,
+    error: RwLock<Option<E>>,
     inner: mpsc::Receiver<CommMsg<T, E>>
 }
 
@@ -51,7 +52,7 @@ T: Send, E: Send + Sync{
 impl <T, E> Sender<T, E> where T: Send, E: Send {
     pub fn from_old(v: mpsc::Sender<CommMsg<T, E>>) -> Sender<T, E> {
         Sender {
-            closed: RWLock::new(false),
+            closed: AtomicBool::new(false),
             inner: v
         }
     }
@@ -64,7 +65,7 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
         match self.inner.send(CommMsg::Message(t)) {
             Ok(()) => Ok(()),
             Err(mpsc::SendError(CommMsg::Message(a))) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 Err(a)
             },
             Err(_) => unreachable!()
@@ -92,7 +93,7 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
         match self.inner.send(CommMsg::Error(e)) {
             Ok(()) => Ok(()),
             Err(mpsc::SendError(CommMsg::Error(a))) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 Err(a)
             }
             Err(_) => unreachable!()
@@ -108,7 +109,7 @@ impl <T, E> Clone for Sender<T, E> where T: Send, E: Send {
     fn clone(&self) -> Sender<T, E> {
         Sender {
             inner: self.inner.clone(),
-            closed: RWLock::new(*self.closed.read().unwrap())
+            closed: RwLock::new(*self.closed.read().unwrap())
         }
     }
 }
@@ -116,8 +117,9 @@ impl <T, E> Clone for Sender<T, E> where T: Send, E: Send {
 impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
     pub fn from_old(v: mpsc::Receiver<CommMsg<T, E>>) -> Receiver<T, E> {
         Receiver {
-            closed: RWLock::new(false),
-            error: RWLock::new(None),
+            closed: AtomicBool::new(false),
+            errored: AtomicBool::new(false),
+            error: RwLock::new(None),
             inner: v
         }
     }
@@ -172,7 +174,7 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
     }
 
     pub fn is_closed(&self) -> bool {
-        * self.closed.read().unwrap()
+        self.closed.load(Ordering::Relaxed)
     }
 
     pub fn iter(&self) -> ReceiverIterator<T, E> {
