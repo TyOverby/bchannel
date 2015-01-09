@@ -101,7 +101,7 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
     }
 
     pub fn is_closed(&self) -> bool {
-        * self.closed.read().unwrap()
+        self.closed.load(Ordering::Relaxed)
     }
 }
 
@@ -109,7 +109,7 @@ impl <T, E> Clone for Sender<T, E> where T: Send, E: Send {
     fn clone(&self) -> Sender<T, E> {
         Sender {
             inner: self.inner.clone(),
-            closed: RwLock::new(*self.closed.read().unwrap())
+            closed: AtomicBool::new(self.closed.load(Ordering::Relaxed))
         }
     }
 }
@@ -136,12 +136,13 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
                 * self.error.write().unwrap() = Some(e);
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
+                self.errored.store(true, Ordering::Relaxed);
                 None
             }
             Err(mpsc::TryRecvError::Empty) => None,
             Err(mpsc::TryRecvError::Disconnected) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 None
             }
         }
@@ -155,18 +156,19 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
                 * self.error.write().unwrap() = Some(e);
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
+                self.errored.store(true, Ordering::Relaxed);
                 None
             }
             Err(mpsc::RecvError) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 None
             }
         }
     }
 
     pub fn has_error(&self) -> bool {
-        self.error.read().unwrap().is_some()
+        self.errored.load(Ordering::Relaxed)
     }
 
     pub fn take_error(&self) -> Option<E> {
