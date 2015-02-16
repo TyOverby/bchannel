@@ -1,6 +1,7 @@
 #![feature(core)]
 
 use std::sync::{mpsc, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(test)]
 mod test;
@@ -16,17 +17,27 @@ enum MaybeOwned<'a, A: 'a> {
     Borrowed(&'a A)
 }
 
+/// The sending end of the channel.
 pub struct Sender<T, E> {
-    closed: RwLock<bool>,
+    closed: AtomicBool,
     inner: mpsc::Sender<CommMsg<T, E>>
 }
 
+/// The receiving end of the channel.
 pub struct Receiver<T, E> {
-    closed: RwLock<bool>,
+    closed: AtomicBool,
+    errored: AtomicBool,
     error: RwLock<Option<E>>,
     inner: mpsc::Receiver<CommMsg<T, E>>
 }
 
+/// An iterator over received items.
+///
+/// This struct can either own or have a reference to the receiver that
+/// it gets its elements from.
+///
+/// This struct can either block when waiting for a message, or it can finish
+/// early (and be reusable) when it runs out of messages in the queue.
 pub struct ReceiverIterator<'a, T: 'a, E: 'a> {
     reference: MaybeOwned<'a, Receiver<T, E>>,
     blocking: bool
@@ -41,6 +52,8 @@ impl <'a, A> MaybeOwned<'a A> {
     }
 }
 
+/// Returns a Sender-Receiver pair sending messages of type T, and
+/// can fail with an error of type E.
 pub fn channel<T, E>() -> (Sender<T, E>, Receiver<T, E>) where
 T: Send, E: Send + Sync{
     let (tx, rx) = mpsc::channel();
@@ -48,28 +61,36 @@ T: Send, E: Send + Sync{
 }
 
 impl <T, E> Sender<T, E> where T: Send, E: Send {
+    /// Converts an old-stype Sender to a bchannel Sender.
     pub fn from_old(v: mpsc::Sender<CommMsg<T, E>>) -> Sender<T, E> {
         Sender {
-            closed: RwLock::new(false),
+            closed: AtomicBool::new(false),
             inner: v
         }
     }
 
+    /// Returns the old-style Sender that is containd inside this Sender.
     pub fn into_inner(self) -> mpsc::Sender<CommMsg<T, E>> {
         self.inner
     }
 
+    /// Sends a message through the channel.  Returns `Ok(())` if the sending
+    /// might succeed, and returns an Err with the message that you tried to
+    /// send in the event that the sending surely failed.
     pub fn send(&self, t: T) -> Result<(), T> {
         match self.inner.send(CommMsg::Message(t)) {
             Ok(()) => Ok(()),
             Err(mpsc::SendError(CommMsg::Message(a))) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 Err(a)
             },
             Err(_) => unreachable!()
         }
     }
 
+    /// Tries to send all of the messages in an iterator.  Returns Ok(()) if the
+    /// sending might succeed and returns Err with a tuple containing the message
+    /// that failed to send, and the remaining iterator.
     pub fn send_all<I: Iterator<Item=T>>(&self, mut i: I) -> Result<(), (T, I)> {
         loop {
             match i.next() {
@@ -85,21 +106,24 @@ impl <T, E> Sender<T, E> where T: Send, E: Send {
         Ok(())
     }
 
+    /// Closes the sending end of the channel.
     pub fn close(self) { }
 
+    /// Closes the sending end of the channel with an error.
     pub fn error(self, e: E) -> Result<(), E> {
         match self.inner.send(CommMsg::Error(e)) {
             Ok(()) => Ok(()),
             Err(mpsc::SendError(CommMsg::Error(a))) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 Err(a)
             }
             Err(_) => unreachable!()
         }
     }
 
+    /// Returns true if any message has failed to send.
     pub fn is_closed(&self) -> bool {
-        * self.closed.read().unwrap()
+        self.closed.load(Ordering::Relaxed)
     }
 }
 
@@ -107,28 +131,35 @@ impl <T, E> Clone for Sender<T, E> where T: Send, E: Send {
     fn clone(&self) -> Sender<T, E> {
         Sender {
             inner: self.inner.clone(),
-            closed: RwLock::new(*self.closed.read().unwrap())
+            closed: AtomicBool::new(self.closed.load(Ordering::Relaxed))
         }
     }
 }
 
 impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
+    /// Converts an old-style receiver to a bchannel receiver.
     pub fn from_old(v: mpsc::Receiver<CommMsg<T, E>>) -> Receiver<T, E> {
         Receiver {
-            closed: RwLock::new(false),
+            closed: AtomicBool::new(false),
+            errored: AtomicBool::new(false),
             error: RwLock::new(None),
             inner: v
         }
     }
 
+    /// Returns the old-style receiver along with the error.
+    /// The error will be None unless this channel was closed by an error.
     pub fn into_inner(self) -> (mpsc::Receiver<CommMsg<T, E>>, Option<E>) {
-        let error = self.error;
-        let inner = self.inner;
-
-        let mut error_guard = error.write().unwrap();
-        (inner, error_guard.take())
+        let mut error_guard = self.error.write().unwrap();
+        (self.inner, error_guard.take())
     }
 
+    /// Returns the next message asyncrhonously.
+    ///
+    /// * If there is a message in the channels queue, it is returned in `Some`.
+    /// * If there is no message ready, None is returned.
+    /// * If the channel is closed, None is returned.
+    /// * If the channel is closed with an error, None is returned.
     pub fn recv(&self) -> Option<T> {
         if self.is_closed() {
             return None
@@ -137,17 +168,25 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
                 * self.error.write().unwrap() = Some(e);
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
+                self.errored.store(true, Ordering::Relaxed);
                 None
             }
             Err(mpsc::TryRecvError::Empty) => None,
             Err(mpsc::TryRecvError::Disconnected) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 None
             }
         }
     }
 
+    /// Returns the next message in the channe.  This method will block
+    /// until either a message arrives or the channel is closed
+    /// (either regularly) or by an error.
+    ///
+    /// * If a message arrives, the message is returned inside of `Some`.
+    /// * If the channel is closed, `None` is returned.
+    /// * If the channel is closed with an error, `None` is returned.
     pub fn recv_block(&self) -> Option<T> {
         if self.is_closed() {
             return None
@@ -156,28 +195,40 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
                 * self.error.write().unwrap() = Some(e);
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
+                self.errored.store(true, Ordering::Relaxed);
                 None
             }
             Err(mpsc::RecvError) => {
-                * self.closed.write().unwrap() = true;
+                self.closed.store(true, Ordering::Relaxed);
                 None
             }
         }
     }
 
+    /// Returns true if the channel was closed with an error.
     pub fn has_error(&self) -> bool {
-        self.error.read().unwrap().is_some()
+        self.errored.load(Ordering::Relaxed)
     }
 
+    /// Returns the error if the channel was closed with an error.
+    /// This method moves the error out of the Receiver, so subsequent
+    /// calls will return None.
+    ///
+    /// Returns `None` if the channel wasn't closed with an error, or if
+    /// the error has already been taken.
     pub fn take_error(&self) -> Option<E> {
+        self.errored.store(false, Ordering::Relaxed);
         self.error.write().unwrap().take()
     }
 
+    /// Returns true if the channel is closed.
     pub fn is_closed(&self) -> bool {
-        * self.closed.read().unwrap()
+        self.closed.load(Ordering::Relaxed)
     }
 
+    /// Returns an iterator over the messages in this receiver.
+    /// The iterator is non-blocking, and borrows this receiver.
     pub fn iter(&self) -> ReceiverIterator<T, E> {
         ReceiverIterator {
             blocking: false,
@@ -185,6 +236,8 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
         }
     }
 
+    /// Returns an iterator over the messages in this receiver.
+    /// The iterator is blocking and borrows this receiver.
     pub fn blocking_iter(&self) -> ReceiverIterator<T, E> {
         ReceiverIterator {
             blocking: true,
@@ -192,6 +245,8 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
         }
     }
 
+    /// Returns an iterator over the messages in this receiver.
+    /// The iterator is non-blocking and consumes this receiver.
     pub fn into_iter(self) -> ReceiverIterator<'static, T, E> {
         ReceiverIterator {
             blocking: false,
@@ -199,6 +254,8 @@ impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
         }
     }
 
+    /// Returns an iterator over the messages in this receiver.
+    /// The iterator is blocking, and consumes this receiver.
     pub fn into_blocking_iter(self) -> ReceiverIterator<'static, T, E> {
         ReceiverIterator {
             blocking: true,
