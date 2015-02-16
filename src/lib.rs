@@ -1,7 +1,6 @@
+#![feature(core)]
 
-#![feature(associated_types, default_type_params)]
-
-use std::sync::{mpsc, RWLock};
+use std::sync::{mpsc, RwLock};
 
 #[cfg(test)]
 mod test;
@@ -18,13 +17,13 @@ enum MaybeOwned<'a, A: 'a> {
 }
 
 pub struct Sender<T, E> {
-    closed: RWLock<bool>,
+    closed: RwLock<bool>,
     inner: mpsc::Sender<CommMsg<T, E>>
 }
 
 pub struct Receiver<T, E> {
-    closed: RWLock<bool>,
-    error: RWLock<Option<E>>,
+    closed: RwLock<bool>,
+    error: RwLock<Option<E>>,
     inner: mpsc::Receiver<CommMsg<T, E>>
 }
 
@@ -51,7 +50,7 @@ T: Send, E: Send + Sync{
 impl <T, E> Sender<T, E> where T: Send, E: Send {
     pub fn from_old(v: mpsc::Sender<CommMsg<T, E>>) -> Sender<T, E> {
         Sender {
-            closed: RWLock::new(false),
+            closed: RwLock::new(false),
             inner: v
         }
     }
@@ -108,7 +107,7 @@ impl <T, E> Clone for Sender<T, E> where T: Send, E: Send {
     fn clone(&self) -> Sender<T, E> {
         Sender {
             inner: self.inner.clone(),
-            closed: RWLock::new(*self.closed.read().unwrap())
+            closed: RwLock::new(*self.closed.read().unwrap())
         }
     }
 }
@@ -116,14 +115,18 @@ impl <T, E> Clone for Sender<T, E> where T: Send, E: Send {
 impl <T, E> Receiver<T, E> where T: Send, E: Send + Sync {
     pub fn from_old(v: mpsc::Receiver<CommMsg<T, E>>) -> Receiver<T, E> {
         Receiver {
-            closed: RWLock::new(false),
-            error: RWLock::new(None),
+            closed: RwLock::new(false),
+            error: RwLock::new(None),
             inner: v
         }
     }
 
     pub fn into_inner(self) -> (mpsc::Receiver<CommMsg<T, E>>, Option<E>) {
-        (self.inner, self.error.write().unwrap().take())
+        let error = self.error;
+        let inner = self.inner;
+
+        let mut error_guard = error.write().unwrap();
+        (inner, error_guard.take())
     }
 
     pub fn recv(&self) -> Option<T> {
