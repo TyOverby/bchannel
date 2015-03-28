@@ -16,13 +16,13 @@ enum MaybeOwned<'a, A: 'a> {
 }
 
 /// The sending end of the channel.
-pub struct Sender<T, E> {
+pub struct Sender<T : Send, E : Send> {
     closed: Cell<bool>,
     inner: mpsc::Sender<CommMsg<T, E>>
 }
 
 /// The receiving end of the channel.
-pub struct Receiver<T, E> {
+pub struct Receiver<T : Send, E : Send> {
     closed: Cell<bool>,
     errored: Cell<bool>,
     error: RwLock<Option<E>>,
@@ -36,7 +36,7 @@ pub struct Receiver<T, E> {
 ///
 /// This struct can either block when waiting for a message, or it can finish
 /// early (and be reusable) when it runs out of messages in the queue.
-pub struct ReceiverIterator<'a, T: 'a, E: 'a> {
+pub struct ReceiverIterator<'a, T: Send + 'a, E: Send + 'a> {
     reference: MaybeOwned<'a, Receiver<T, E>>,
     blocking: bool
 }
