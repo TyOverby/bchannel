@@ -1,4 +1,3 @@
-#![feature(core)]
 use std::sync::{mpsc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 
