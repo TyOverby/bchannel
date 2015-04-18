@@ -1,5 +1,5 @@
 use std::sync::{mpsc, RwLock};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::cell::Cell;
 
 #[cfg(test)]
 mod test;
@@ -16,15 +16,15 @@ enum MaybeOwned<'a, A: 'a> {
 }
 
 /// The sending end of the channel.
-pub struct Sender<T, E> {
-    closed: AtomicBool,
+pub struct Sender<T : Send, E : Send> {
+    closed: Cell<bool>,
     inner: mpsc::Sender<CommMsg<T, E>>
 }
 
 /// The receiving end of the channel.
-pub struct Receiver<T, E> {
-    closed: AtomicBool,
-    errored: AtomicBool,
+pub struct Receiver<T : Send, E : Send> {
+    closed: Cell<bool>,
+    errored: Cell<bool>,
     error: RwLock<Option<E>>,
     inner: mpsc::Receiver<CommMsg<T, E>>
 }
@@ -36,7 +36,7 @@ pub struct Receiver<T, E> {
 ///
 /// This struct can either block when waiting for a message, or it can finish
 /// early (and be reusable) when it runs out of messages in the queue.
-pub struct ReceiverIterator<'a, T: 'a, E: 'a> {
+pub struct ReceiverIterator<'a, T: Send + 'a, E: Send + 'a> {
     reference: MaybeOwned<'a, Receiver<T, E>>,
     blocking: bool
 }
@@ -63,7 +63,7 @@ where T: Send + 'static, E: Send + 'static {
     /// Converts an old-stype Sender to a bchannel Sender.
     pub fn from_old(v: mpsc::Sender<CommMsg<T, E>>) -> Sender<T, E> {
         Sender {
-            closed: AtomicBool::new(false),
+            closed: Cell::new(false),
             inner: v
         }
     }
@@ -80,7 +80,7 @@ where T: Send + 'static, E: Send + 'static {
         match self.inner.send(CommMsg::Message(t)) {
             Ok(()) => Ok(()),
             Err(mpsc::SendError(CommMsg::Message(a))) => {
-                self.closed.store(true, Ordering::Relaxed);
+                self.closed.set(true);
                 Err(a)
             },
             Err(_) => unreachable!()
@@ -113,7 +113,7 @@ where T: Send + 'static, E: Send + 'static {
         match self.inner.send(CommMsg::Error(e)) {
             Ok(()) => Ok(()),
             Err(mpsc::SendError(CommMsg::Error(a))) => {
-                self.closed.store(true, Ordering::Relaxed);
+                self.closed.set(true);
                 Err(a)
             }
             Err(_) => unreachable!()
@@ -122,7 +122,7 @@ where T: Send + 'static, E: Send + 'static {
 
     /// Returns true if any message has failed to send.
     pub fn is_closed(&self) -> bool {
-        self.closed.load(Ordering::Relaxed)
+        self.closed.get()
     }
 }
 
@@ -131,7 +131,7 @@ where T: Send + 'static, E: Send + 'static {
     fn clone(&self) -> Sender<T, E> {
         Sender {
             inner: self.inner.clone(),
-            closed: AtomicBool::new(self.closed.load(Ordering::Relaxed))
+            closed: Cell::new(self.closed.get())
         }
     }
 }
@@ -141,8 +141,8 @@ where T: Send + 'static, E: Send + Sync + 'static {
     /// Converts an old-style receiver to a bchannel receiver.
     pub fn from_old(v: mpsc::Receiver<CommMsg<T, E>>) -> Receiver<T, E> {
         Receiver {
-            closed: AtomicBool::new(false),
-            errored: AtomicBool::new(false),
+            closed: Cell::new(false),
+            errored: Cell::new(false),
             error: RwLock::new(None),
             inner: v
         }
@@ -169,13 +169,13 @@ where T: Send + 'static, E: Send + Sync + 'static {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
                 * self.error.write().unwrap() = Some(e);
-                self.closed.store(true, Ordering::Relaxed);
-                self.errored.store(true, Ordering::Relaxed);
+                self.closed.set(true);
+                self.errored.set(true);
                 None
             }
             Err(mpsc::TryRecvError::Empty) => None,
             Err(mpsc::TryRecvError::Disconnected) => {
-                self.closed.store(true, Ordering::Relaxed);
+                self.closed.set(true);
                 None
             }
         }
@@ -196,12 +196,12 @@ where T: Send + 'static, E: Send + Sync + 'static {
             Ok(CommMsg::Message(m)) => Some(m),
             Ok(CommMsg::Error(e)) => {
                 * self.error.write().unwrap() = Some(e);
-                self.closed.store(true, Ordering::Relaxed);
-                self.errored.store(true, Ordering::Relaxed);
+                self.closed.set(true);
+                self.errored.set(true);
                 None
             }
             Err(mpsc::RecvError) => {
-                self.closed.store(true, Ordering::Relaxed);
+                self.closed.set(true);
                 None
             }
         }
@@ -209,7 +209,7 @@ where T: Send + 'static, E: Send + Sync + 'static {
 
     /// Returns true if the channel was closed with an error.
     pub fn has_error(&self) -> bool {
-        self.errored.load(Ordering::Relaxed)
+        self.errored.get()
     }
 
     /// Returns the error if the channel was closed with an error.
@@ -219,13 +219,13 @@ where T: Send + 'static, E: Send + Sync + 'static {
     /// Returns `None` if the channel wasn't closed with an error, or if
     /// the error has already been taken.
     pub fn take_error(&self) -> Option<E> {
-        self.errored.store(false, Ordering::Relaxed);
+        self.errored.set(false);
         self.error.write().unwrap().take()
     }
 
     /// Returns true if the channel is closed.
     pub fn is_closed(&self) -> bool {
-        self.closed.load(Ordering::Relaxed)
+        self.closed.get()
     }
 
     /// Returns an iterator over the messages in this receiver.
