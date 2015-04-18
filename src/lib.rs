@@ -53,7 +53,7 @@ impl <'a, A> MaybeOwned<'a A> {
 /// Returns a Sender-Receiver pair sending messages of type T, and
 /// can fail with an error of type E.
 pub fn channel<T, E>() -> (Sender<T, E>, Receiver<T, E>)
-where T: Send + 'static, E: Send + Sync + 'static{
+where T: Send + 'static, E: Send + 'static{
     let (tx, rx) = mpsc::channel();
     (Sender::from_old(tx), Receiver::from_old(rx))
 }
@@ -137,7 +137,7 @@ where T: Send + 'static, E: Send + 'static {
 }
 
 impl <T, E> Receiver<T, E>
-where T: Send + 'static, E: Send + Sync + 'static {
+where T: Send + 'static, E: Send + 'static {
     /// Converts an old-style receiver to a bchannel receiver.
     pub fn from_old(v: mpsc::Receiver<CommMsg<T, E>>) -> Receiver<T, E> {
         Receiver {
@@ -266,7 +266,7 @@ where T: Send + 'static, E: Send + Sync + 'static {
 }
 
 impl <'a, T, E> Iterator for ReceiverIterator<'a, T, E>
-where T: Send + 'static, E: Send + Sync + 'static {
+where T: Send + 'static, E: Send + 'static {
     type Item = T;
     fn next(&mut self) -> Option<T> {
         if self.blocking {
