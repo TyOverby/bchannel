@@ -41,7 +41,7 @@ pub struct ReceiverIterator<'a, T: Send + 'a, E: Send + 'a> {
     blocking: bool
 }
 
-impl <'a, A> MaybeOwned<'a A> {
+impl <'a, A> MaybeOwned<'a, A> {
     fn borrow<'b: 'a>(&'b self) -> &'b A  {
         match *self {
             MaybeOwned::Owned(ref a) => a,
