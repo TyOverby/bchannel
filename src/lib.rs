@@ -136,6 +136,7 @@ where T: Send + 'static, E: Send + 'static {
     }
 }
 
+
 impl <T, E> Receiver<T, E>
 where T: Send + 'static, E: Send + 'static {
     /// Converts an old-style receiver to a bchannel receiver.
@@ -276,3 +277,6 @@ where T: Send + 'static, E: Send + 'static {
         }
     }
 }
+
+unsafe impl <T, E> Send for Receiver<T, E> {}
+unsafe impl <T, E> Send for Sender<T, E> {}
