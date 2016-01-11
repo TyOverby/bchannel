@@ -278,5 +278,5 @@ where T: Send + 'static, E: Send + 'static {
     }
 }
 
-unsafe impl <T, E> Send for Receiver<T, E> {}
-unsafe impl <T, E> Send for Sender<T, E> {}
+unsafe impl <T: Send, E: Send> Send for Receiver<T, E> {}
+unsafe impl <T: Send, E: Send> Send for Sender<T, E> {}
